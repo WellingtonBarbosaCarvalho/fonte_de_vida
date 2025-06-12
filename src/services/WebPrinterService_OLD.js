@@ -3,10 +3,222 @@ import { format } from "date-fns";
 class WebPrinterService {
   constructor() {
     this.paperWidth = 42; // Largura do papel em caracteres (48mm térmico)
-    this.printServerUrl = "http://localhost:3001"; // Servidor local de impressão
+    this.printServerUrl = "http://localhost:3001"; // Servidor local de impr  // Mostrar diálogo de impressão no navegador
+  async showPrintDialog(receiptText, order) {
+    // Criar uma nova janela/aba para impressão
+    const printWindow = window.open("", "_blank", "width=420,height=650");
 
-    // Detectar sistema operacional
-    this.isWindows = navigator.platform.indexOf("Win") > -1;
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Cupom Pedido ${order.id}</title>
+        <meta charset="UTF-8">
+        <style>
+          /* Estilos para tela */
+          body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 15px;
+            line-height: 1.3;
+            background: #f0f0f0;
+          }
+          
+          .container {
+            max-width: 350px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          }
+          
+          .controls {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 6px;
+          }
+          
+          .controls button {
+            margin: 8px 5px;
+            padding: 12px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.2s;
+          }
+          
+          .btn-print {
+            background: #10b981;
+            color: white;
+          }
+          
+          .btn-print:hover {
+            background: #059669;
+            transform: translateY(-1px);
+          }
+          
+          .btn-download {
+            background: #3b82f6;
+            color: white;
+          }
+          
+          .btn-download:hover {
+            background: #2563eb;
+          }
+          
+          .btn-close {
+            background: #ef4444;
+            color: white;
+          }
+          
+          .btn-close:hover {
+            background: #dc2626;
+          }
+          
+          .instructions {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 13px;
+          }
+          
+          .receipt-preview {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            background: white;
+            border: 2px dashed #ccc;
+            padding: 15px;
+            white-space: pre-line;
+            margin: 15px 0;
+          }
+
+          /* CSS ESPECÍFICO PARA IMPRESSÃO TÉRMICA */
+          @media print {
+            * {
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              background: white !important;
+              color: black !important;
+            }
+            
+            html, body {
+              font-family: 'Courier New', monospace !important;
+              font-size: 12px !important;
+              line-height: 1.2 !important;
+              width: 80mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            
+            .no-print {
+              display: none !important;
+            }
+            
+            .receipt-print {
+              font-family: 'Courier New', monospace !important;
+              font-size: 12px !important;
+              line-height: 1.2 !important;
+              white-space: pre-line !important;
+              word-wrap: break-word !important;
+              color: black !important;
+              background: white !important;
+              width: 100% !important;
+              max-width: none !important;
+            }
+            
+            @page {
+              size: 80mm auto !important;
+              margin: 0mm !important;
+              padding: 0mm !important;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <!-- Controles (não imprimem) -->
+          <div class="no-print controls">
+            <h3 style="margin: 0 0 15px 0; color: #1f2937;">🖨️ Imprimir Cupom</h3>
+            <button class="btn-print" onclick="imprimirAgora()">
+              🖨️ IMPRIMIR AGORA
+            </button>
+            <br>
+            <button class="btn-download" onclick="baixarTXT()">
+              💾 Baixar TXT
+            </button>
+            <button class="btn-close" onclick="window.close()">
+              ❌ Fechar
+            </button>
+          </div>
+          
+          <!-- Instruções simples -->
+          <div class="no-print instructions">
+            <strong>📋 INSTRUÇÕES SIMPLES:</strong><br>
+            1️⃣ Clique em "<strong>IMPRIMIR AGORA</strong>"<br>
+            2️⃣ Na janela que abrir, selecione sua impressora térmica<br>
+            3️⃣ Configure: <strong>Papel = A4</strong> e <strong>Margens = Estreitas</strong><br>
+            4️⃣ Clique em <strong>Imprimir</strong><br><br>
+            💡 <strong>Dica:</strong> Se não sair direito, use "Baixar TXT" e imprima o arquivo manualmente
+          </div>
+          
+          <!-- Preview do cupom -->
+          <div class="no-print">
+            <h4 style="margin: 15px 0 10px 0; color: #374151;">📄 Preview do Cupom:</h4>
+            <div class="receipt-preview">${receiptText}</div>
+          </div>
+          
+          <!-- Conteúdo real para impressão (invisível na tela) -->
+          <div class="receipt-print" style="display: none;">${receiptText}</div>
+        </div>
+        
+        <script>
+          function imprimirAgora() {
+            // Mostrar apenas o conteúdo de impressão
+            document.querySelector('.receipt-print').style.display = 'block';
+            document.querySelector('.container').style.display = 'none';
+            
+            // Imprimir
+            window.print();
+            
+            // Aguardar e restaurar visualização
+            setTimeout(() => {
+              document.querySelector('.receipt-print').style.display = 'none';
+              document.querySelector('.container').style.display = 'block';
+            }, 1000);
+          }
+          
+          function baixarTXT() {
+            const element = document.createElement('a');
+            const texto = \`${receiptText.replace(/'/g, "\\\'")}\`;
+            const file = new Blob([texto], {type: 'text/plain; charset=utf-8'});
+            element.href = URL.createObjectURL(file);
+            element.download = 'cupom_pedido_${order.id}.txt';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            
+            alert('✅ Arquivo baixado! Abra o arquivo e imprima manualmente na sua impressora.');
+          }
+          
+          // Focar na janela
+          window.focus();
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  }dows = navigator.platform.indexOf("Win") > -1;
     this.isLinux = navigator.platform.indexOf("Linux") > -1;
     this.isMac = navigator.platform.indexOf("Mac") > -1;
 
@@ -22,101 +234,9 @@ class WebPrinterService {
           : "Desconhecido"
       }`
     );
-
-    // Configurar listener para mensagens do Service Worker
-    this.setupServiceWorkerListener();
   }
 
-  // Configurar listener para comunicação com Service Worker
-  setupServiceWorkerListener() {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        console.log("📨 Mensagem recebida do Service Worker:", event.data);
-
-        if (event.data.type === "THERMAL_PRINT_REQUEST") {
-          this.handleServiceWorkerPrint(event.data.payload);
-        }
-
-        if (event.data.type === "RETRY_PRINT") {
-          this.handleRetryPrint(event.data.data);
-        }
-      });
-
-      // Verificar se o service worker está ativo
-      navigator.serviceWorker.ready.then((registration) => {
-        console.log("✅ Service Worker pronto para impressão térmica");
-
-        // Enviar mensagem para verificar capacidades
-        if (registration.active) {
-          registration.active.postMessage({
-            type: "PRINT_STATUS",
-          });
-        }
-      });
-    }
-  }
-
-  // Handler para impressão via Service Worker
-  async handleServiceWorkerPrint(payload) {
-    try {
-      console.log("🔥 Executando impressão térmica via PWA Service Worker");
-
-      if (payload.data && payload.data.text) {
-        // Usar impressão automática térmica
-        const order = payload.data.order || { id: "PWA-" + Date.now() };
-        await this.printThermalAutomatic(payload.data.text, order);
-
-        this.showSuccessNotification("✅ Impressão térmica PWA executada!");
-      }
-    } catch (error) {
-      console.error("❌ Erro na impressão via Service Worker:", error);
-      this.showToast("Erro na impressão PWA: " + error.message, "error");
-    }
-  }
-
-  // Handler para retry de impressão
-  async handleRetryPrint(data) {
-    try {
-      console.log("🔄 Reexecutando impressão pendente");
-      const order = data.order || { id: "RETRY-" + Date.now() };
-      await this.printThermalAutomatic(data.text, order);
-    } catch (error) {
-      console.error("❌ Erro no retry de impressão:", error);
-    }
-  }
-
-  // Método para enviar impressão via Service Worker
-  async sendPrintToServiceWorker(receiptText, order) {
-    try {
-      if ("serviceWorker" in navigator) {
-        // Criar uma requisição de impressão fake para ser interceptada
-        const printData = {
-          text: receiptText,
-          order: order,
-          timestamp: new Date().toISOString(),
-        };
-
-        // Enviar via fetch para ser interceptada pelo SW
-        const response = await fetch("/api/thermal-print", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(printData),
-        });
-
-        const result = await response.json();
-        console.log("📤 Resposta do Service Worker:", result);
-
-        return result;
-      }
-    } catch (error) {
-      console.error("❌ Erro ao enviar para Service Worker:", error);
-      throw error;
-    }
-  }
-
-  // Método principal para processar e "imprimir" pedido no navegador - SOLUÇÃO 100% AUTOMÁTICA
+  // Método principal para processar e "imprimir" pedido no navegador
   async printOrder(order, customer, products) {
     try {
       console.log("🖨️ Processando pedido para impressão web:", order.id);
@@ -124,15 +244,13 @@ class WebPrinterService {
       // Gerar recibo em texto
       const receiptText = this.generateTextReceipt(order, customer, products);
 
-      // 1. PRIORIDADE MÁXIMA: Verificar se tem API do Electron disponível (versão desktop)
+      // 1. Verificar se tem API do Electron disponível (versão desktop)
       if (window.electronAPI) {
         console.log("🖥️ Modo Desktop detectado - usando impressão direta");
         try {
           const result = await window.electronAPI.printReceipt(receiptText);
           if (result.success) {
-            this.showSuccessNotification(
-              "✅ Impresso diretamente na impressora!"
-            );
+            this.showSuccessNotification('Impresso diretamente na impressora!');
             return { success: true, method: "electron-direct" };
           }
         } catch (electronError) {
@@ -140,7 +258,7 @@ class WebPrinterService {
         }
       }
 
-      // 2. SEGUNDA PRIORIDADE: Tentar usar servidor local de impressão (RAW)
+      // 2. Tentar usar servidor local de impressão
       try {
         const serverResult = await this.tryPrintWithServer(receiptText);
         if (serverResult.success) {
@@ -150,18 +268,13 @@ class WebPrinterService {
         console.warn("⚠️ Servidor local não disponível:", serverError.message);
       }
 
-      // 3. TERCEIRA PRIORIDADE: Impressão via Service Worker (PWA) - NOVA FUNCIONALIDADE!
-      if ("serviceWorker" in navigator) {
+      // 3. Tentar impressão via Service Worker (PWA)
+      if ('serviceWorker' in navigator) {
         try {
           console.log("📱 Tentando impressão via Service Worker...");
-          const swResult = await this.sendPrintToServiceWorker(
-            receiptText,
-            order
-          );
+          const swResult = await this.sendPrintToServiceWorker(receiptText, order);
           if (swResult.success) {
-            this.showSuccessNotification(
-              "✅ Impressão PWA automática executada!"
-            );
+            this.showSuccessNotification('✅ Impressão PWA executada!');
             return swResult;
           }
         } catch (swError) {
@@ -169,13 +282,71 @@ class WebPrinterService {
         }
       }
 
-      // 4. QUARTA PRIORIDADE: Detectar se é impressora térmica e usar impressão automática
+      // 4. Detectar se é impressora térmica e usar impressão automática
       if (await this.detectThermalPrinter()) {
         console.log("🔥 Impressora térmica detectada - impressão automática");
         return await this.printThermalAutomatic(receiptText, order);
       }
 
-      // 5. FALLBACK FINAL: Diálogo de impressão otimizado
+      // 5. Fallback: diálogo de impressão otimizado
+      console.log("📋 Usando diálogo de impressão otimizado");
+      await this.showPrintDialog(receiptText, order);
+
+      return { success: true, method: "web-browser-optimized" };
+    } catch (error) {
+      console.error("❌ Erro na impressão web:", error);
+      throw error;
+    }
+  }
+
+  // Método para enviar impressão via Service Worker
+  async sendPrintToServiceWorker(receiptText, order) {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        
+        // Criar uma requisição de impressão fake para ser interceptada
+        const printData = {
+          text: receiptText,
+          order: order,
+          timestamp: new Date().toISOString()
+        };
+
+        // Enviar via fetch para ser interceptada pelo SW
+        const response = await fetch('/api/thermal-print', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(printData)
+        });
+
+        const result = await response.json();
+        console.log('📤 Resposta do Service Worker:', result);
+
+        return result;
+      }
+    } catch (error) {
+      console.error('❌ Erro ao enviar para Service Worker:', error);
+      throw error;
+    }
+  }
+          if (result.success) {
+            this.showSuccessNotification('Impresso diretamente na impressora!');
+            return { success: true, method: "electron-direct" };
+          }
+        } catch (electronError) {
+          console.warn("⚠️ Erro no Electron:", electronError);
+        }
+      }
+
+      // 2. Detectar se é impressora térmica e usar impressão automática
+      if (await this.detectThermalPrinter()) {
+        console.log("🔥 Impressora térmica detectada - impressão automática");
+        return await this.printThermalAutomatic(receiptText, order);
+      }
+
+      // 3. Fallback: diálogo de impressão otimizado
       console.log("📋 Usando diálogo de impressão otimizado");
       await this.showPrintDialog(receiptText, order);
 
@@ -190,26 +361,20 @@ class WebPrinterService {
   async detectThermalPrinter() {
     try {
       // Verificar se há indicações de impressora térmica
-      const isKiosk =
-        window.navigator.standalone ||
-        window.matchMedia("(display-mode: standalone)").matches ||
-        document.referrer.includes("android-app://") ||
-        window.top !== window.self;
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isKiosk = window.navigator.standalone || 
+                     window.matchMedia('(display-mode: standalone)').matches ||
+                     document.referrer.includes('android-app://') ||
+                     window.top !== window.self;
 
       // Verificar configurações salvas
-      const settings = JSON.parse(
-        localStorage.getItem("fontevida_settings") || "{}"
-      );
+      const settings = JSON.parse(localStorage.getItem('fontevida_settings') || '{}');
       const printerConfig = settings.impressora || {};
-
-      return (
-        printerConfig.modo_termica === true ||
-        printerConfig.tipo === "termica" ||
-        printerConfig.modo_impressao === "thermal_direct" ||
-        printerConfig.nome?.includes("Generic") ||
-        printerConfig.nome?.includes("Thermal") ||
-        isKiosk
-      );
+      
+      return printerConfig.modo_termica === true || 
+             printerConfig.impressora_modelo?.includes('Generic') ||
+             printerConfig.impressora_modelo?.includes('Thermal') ||
+             isKiosk;
     } catch (error) {
       return false;
     }
@@ -219,15 +384,15 @@ class WebPrinterService {
   async printThermalAutomatic(receiptText, order) {
     try {
       console.log("🔥 Iniciando impressão térmica automática...");
-
+      
       // Criar iframe invisível para impressão
-      const printFrame = document.createElement("iframe");
-      printFrame.style.position = "absolute";
-      printFrame.style.top = "-9999px";
-      printFrame.style.left = "-9999px";
-      printFrame.style.width = "80mm";
-      printFrame.style.height = "auto";
-
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'absolute';
+      printFrame.style.top = '-9999px';
+      printFrame.style.left = '-9999px';
+      printFrame.style.width = '80mm';
+      printFrame.style.height = 'auto';
+      
       document.body.appendChild(printFrame);
 
       // Conteúdo otimizado para impressão térmica
@@ -268,9 +433,7 @@ class WebPrinterService {
                 window.print();
                 // Remover iframe após impressão
                 setTimeout(() => {
-                  if (parent.document.querySelector('iframe[style*="-9999px"]')) {
-                    parent.document.body.removeChild(parent.document.querySelector('iframe[style*="-9999px"]'));
-                  }
+                  parent.document.body.removeChild(parent.document.querySelector('iframe[style*="-9999px"]'));
                 }, 1000);
               }, 100);
             };
@@ -285,21 +448,22 @@ class WebPrinterService {
       printFrame.contentDocument.close();
 
       // Mostrar feedback de sucesso
-      this.showSuccessNotification("✅ Cupom enviado para impressão térmica!");
-
+      this.showSuccessNotification('Cupom enviado para impressão térmica!');
+      
       return {
         success: true,
-        method: "thermal-automatic",
-        message: "Impressão térmica automática executada",
+        method: 'thermal-automatic',
+        message: 'Impressão térmica automática executada'
       };
+
     } catch (error) {
       console.error("❌ Erro na impressão automática:", error);
-
+      
       // Fallback para diálogo manual
       await this.showPrintDialog(receiptText, order);
       return {
         success: true,
-        method: "thermal-automatic-fallback",
+        method: 'thermal-automatic-fallback'
       };
     }
   }
@@ -335,7 +499,7 @@ class WebPrinterService {
 
       if (result.success) {
         // Mostrar notificação de sucesso
-        this.showSuccessNotification("✅ Impresso via servidor local (RAW)");
+        this.showSuccessNotification("Impresso via servidor local (RAW)");
 
         return {
           success: true,
@@ -418,10 +582,7 @@ class WebPrinterService {
     // Info do pedido
     lines.push(`Pedido: ${order.id}`);
     lines.push(
-      `Data: ${format(
-        new Date(order.created_at || order.createdAt),
-        "dd/MM/yyyy HH:mm"
-      )}`
+      `Data: ${format(new Date(order.created_at), "dd/MM/yyyy HH:mm")}`
     );
 
     // Info do cliente
@@ -441,9 +602,7 @@ class WebPrinterService {
     // Itens
     let total = 0;
     order.items.forEach((item) => {
-      const product = products.find(
-        (p) => p.id === item.product_id || p.id === item.productId
-      );
+      const product = products.find((p) => p.id === item.product_id);
       if (product) {
         const subtotal = item.quantity * (item.unit_price || item.price);
         total += subtotal;
@@ -502,6 +661,7 @@ class WebPrinterService {
         <title>Pedido ${order.id}</title>
         <meta charset="UTF-8">
         <style>
+          /* Estilos para visualização na tela */
           body {
             font-family: 'Courier New', monospace;
             font-size: 12px;
@@ -547,6 +707,7 @@ class WebPrinterService {
             font-size: 13px;
           }
 
+          /* CSS para impressão térmica */
           @media print {
             * {
               margin: 0 !important;
@@ -637,6 +798,12 @@ class WebPrinterService {
             document.body.removeChild(element);
           }
           
+          // Função para imprimir com configurações específicas
+          function printThermal() {
+            window.print();
+          }
+          
+          // Focar na janela
           window.focus();
           
           console.log('💡 Dica: Selecione a impressora "Generic / Text Only" na caixa de diálogo');

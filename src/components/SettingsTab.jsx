@@ -155,6 +155,124 @@ const SettingsTab = ({ modal }) => {
     );
   };
 
+  // Função para detectar automaticamente impressora térmica
+  const handleAutoDetectPrinter = async () => {
+    try {
+      console.log("🔍 Iniciando detecção automática de impressora térmica...");
+      
+      // Mostrar loading
+      modal.showAlert('Detectando impressora térmica...', 'info');
+      
+      // Verificar se está no ambiente Electron
+      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+      
+      // Detectar sistema operacional
+      const isWindows = navigator.platform.indexOf('Win') > -1;
+      const isLinux = navigator.platform.indexOf('Linux') > -1;
+      const isMac = navigator.platform.indexOf('Mac') > -1;
+      
+      // Verificar se está em modo PWA ou kiosk
+      const isPWA = window.navigator.standalone || 
+                   window.matchMedia('(display-mode: standalone)').matches ||
+                   document.referrer.includes('android-app://');
+      
+      // Configuração otimizada baseada no ambiente
+      let detectedConfig = {
+        tipo: 'auto',
+        nome: 'Generic / Text Only',
+        largura_papel: 80,
+        modo_impressao: 'auto',
+        imprimir_automatico: true,
+        auto_corte: true,
+        modo_termica: true
+      };
+      
+      // Ajustar configuração baseado no ambiente
+      if (isElectron) {
+        console.log("🖥️ Ambiente Electron detectado");
+        detectedConfig.modo_impressao = 'thermal_direct';
+        detectedConfig.tipo = 'termica';
+      } else if (isPWA) {
+        console.log("📱 Modo PWA detectado");
+        detectedConfig.modo_impressao = 'thermal_direct';
+        detectedConfig.tipo = 'termica';
+      } else {
+        console.log("🌐 Ambiente navegador detectado");
+        detectedConfig.modo_impressao = 'auto';
+      }
+      
+      // Verificar servidor de impressão local
+      try {
+        const response = await fetch('http://localhost:3001/status', {
+          method: 'GET',
+          signal: AbortSignal.timeout(2000)
+        });
+        
+        if (response.ok) {
+          console.log("✅ Servidor de impressão local encontrado");
+          detectedConfig.servidor_local = true;
+          detectedConfig.modo_impressao = 'thermal_direct';
+        }
+      } catch (error) {
+        console.log("⚠️ Servidor local não encontrado:", error.message);
+        detectedConfig.servidor_local = false;
+      }
+      
+      // Aplicar configurações detectadas
+      const newSettings = {
+        ...tempSettings,
+        impressora: {
+          ...tempSettings.impressora,
+          ...detectedConfig
+        }
+      };
+      
+      setTempSettings(newSettings);
+      
+      // Mostrar resultado da detecção
+      const environmentInfo = [
+        `🖥️ Ambiente: ${isElectron ? 'Electron (Desktop)' : isPWA ? 'PWA (Aplicativo)' : 'Navegador Web'}`,
+        `💻 Sistema: ${isWindows ? 'Windows' : isLinux ? 'Linux' : isMac ? 'macOS' : 'Desconhecido'}`,
+        `🖨️ Modo: ${detectedConfig.modo_impressao}`,
+        `📏 Papel: ${detectedConfig.largura_papel}mm`,
+        `🔌 Servidor local: ${detectedConfig.servidor_local ? 'Ativo' : 'Inativo'}`
+      ].join('\n');
+      
+      modal.showAlert(
+        `Detecção concluída com sucesso!\n\n${environmentInfo}\n\n✅ Configuração otimizada aplicada`,
+        'success'
+      );
+      
+      console.log("✅ Detecção automática concluída:", detectedConfig);
+      
+    } catch (error) {
+      console.error("❌ Erro na detecção automática:", error);
+      modal.showAlert(
+        `Erro na detecção automática: ${error.message}\n\nUsando configuração padrão para impressora térmica.`,
+        'error'
+      );
+      
+      // Configuração padrão em caso de erro
+      const fallbackConfig = {
+        tipo: 'termica',
+        nome: 'Generic / Text Only',
+        largura_papel: 80,
+        modo_impressao: 'auto',
+        imprimir_automatico: true,
+        auto_corte: true,
+        modo_termica: true
+      };
+      
+      setTempSettings({
+        ...tempSettings,
+        impressora: {
+          ...tempSettings.impressora,
+          ...fallbackConfig
+        }
+      });
+    }
+  };
+
   const renderEmpresaSection = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -357,7 +475,41 @@ const SettingsTab = ({ modal }) => {
 
   const renderImpressoraSection = () => (
     <div className="space-y-6">
+      {/* Seção de detecção automática */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Info className="w-5 h-5 text-blue-600" />
+          <h4 className="font-medium text-blue-800">Configuração Automática</h4>
+        </div>
+        <p className="text-sm text-blue-700 mb-3">
+          Para impressoras térmicas, recomendamos a configuração automática que otimiza a impressão.
+        </p>
+        <button
+          onClick={handleAutoDetectPrinter}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+        >
+          🔍 Detectar Impressora Térmica
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tipo de Impressora
+          </label>
+          <select
+            value={tempSettings.impressora.tipo}
+            onChange={(e) => handleChange('impressora.tipo', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="auto">🔍 Detectar Automaticamente</option>
+            <option value="termica">🔥 Térmica (80mm)</option>
+            <option value="termica_58">🔥 Térmica (58mm)</option>
+            <option value="comum">🖨️ Impressora Comum</option>
+            <option value="laser">⚡ Laser</option>
+          </select>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Nome da Impressora
@@ -367,37 +519,59 @@ const SettingsTab = ({ modal }) => {
             value={tempSettings.impressora.nome}
             onChange={(e) => handleChange('impressora.nome', e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Nome da impressora"
+            placeholder="Ex: Generic / Text Only"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo
-          </label>
-          <select
-            value={tempSettings.impressora.tipo}
-            onChange={(e) => handleChange('impressora.tipo', e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="termica">Térmica</option>
-            <option value="jato_tinta">Jato de Tinta</option>
-            <option value="laser">Laser</option>
-          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Para impressoras térmicas, geralmente é "Generic / Text Only"
+          </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Largura do Papel (mm)
           </label>
-          <input
-            type="number"
-            min="40"
-            max="200"
+          <select
             value={tempSettings.impressora.largura_papel}
             onChange={(e) => handleChange('impressora.largura_papel', parseInt(e.target.value))}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          >
+            <option value="58">58mm (cupom pequeno)</option>
+            <option value="80">80mm (cupom padrão)</option>
+            <option value="210">210mm (A4)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Modo de Impressão
+          </label>
+          <select
+            value={tempSettings.impressora.modo_impressao || 'auto'}
+            onChange={(e) => handleChange('impressora.modo_impressao', e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="auto">🤖 Automático (Recomendado)</option>
+            <option value="thermal_direct">🔥 Térmica Direta</option>
+            <option value="browser_dialog">🌐 Diálogo do Navegador</option>
+            <option value="download_txt">💾 Download TXT</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Configuração automática térmica */}
+      {tempSettings.impressora.tipo === 'termica' && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Check className="w-5 h-5 text-green-600" />
+            <h4 className="font-medium text-green-800">Impressora Térmica Configurada</h4>
+          </div>
+          <div className="text-sm text-green-700 space-y-1">
+            <p>✅ Impressão direta ativada</p>
+            <p>✅ Formatação otimizada para {tempSettings.impressora.largura_papel}mm</p>
+            <p>✅ Modo automático habilitado</p>
+          </div>
+        </div>
+      )}
         </div>
       </div>
 

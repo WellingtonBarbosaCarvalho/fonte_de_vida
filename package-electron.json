@@ -1,0 +1,38 @@
+{
+  "name": "fonte-vida-desktop",
+  "version": "1.0.0",
+  "description": "Fonte de Vida - Versão Desktop com Impressão",
+  "main": "electron-main.js",
+  "scripts": {
+    "electron": "electron .",
+    "electron-dev": "electron . --dev",
+    "build-electron": "electron-builder",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.fontevida.app",
+    "productName": "Fonte de Vida",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.js",
+      "electron-preload.js"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
