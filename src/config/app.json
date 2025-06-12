@@ -1,0 +1,44 @@
+{
+  "pwa": {
+    "name": "Fonte de Vida",
+    "shortName": "FonteVida",
+    "description": "Sistema de Gerenciamento de Pedidos",
+    "themeColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "startUrl": "/",
+    "scope": "/"
+  },
+  "server": {
+    "dev": {
+      "host": "localhost",
+      "port": 5173
+    },
+    "preview": {
+      "host": "0.0.0.0",
+      "port": 4173
+    }
+  },
+  "storage": {
+    "prefix": "fonte_vida_",
+    "version": "1.0.0",
+    "keys": {
+      "customers": "customers",
+      "products": "products", 
+      "orders": "orders",
+      "settings": "settings"
+    }
+  },
+  "printer": {
+    "paperWidth": 42,
+    "autoOpen": true,
+    "autoPrint": true,
+    "delay": 1000
+  },
+  "app": {
+    "version": "2.0.0",
+    "mode": "pwa",
+    "debug": false
+  }
+}
