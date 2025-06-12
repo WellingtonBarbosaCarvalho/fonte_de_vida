@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.png", "icon-*.png"],
+      includeAssets: ["icon.svg", "logo_site.png"],
       manifest: {
         name: "Fonte de Vida",
         short_name: "FonteVida",
@@ -21,12 +21,17 @@ export default defineConfig({
         start_url: "/",
         icons: [
           {
-            src: "/icon-192x192.png",
+            src: "/icon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+          },
+          {
+            src: "/logo_site.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "/icon-512x512.png",
+            src: "/logo_site.png",
             sizes: "512x512",
             type: "image/png",
           },

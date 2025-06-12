@@ -18,12 +18,12 @@ const PWAInstallPrompt = () => {
       e.preventDefault();
       setDeferredPrompt(e);
       
-      // Mostrar prompt após 10 segundos se não foi instalado
+      // Mostrar prompt após 3 segundos se não foi instalado
       setTimeout(() => {
-        if (!isInstalled) {
+        if (!isInstalled && !sessionStorage.getItem('pwa-prompt-dismissed')) {
           setShowPrompt(true);
         }
-      }, 10000);
+      }, 3000);
     };
 
     // Listener para quando o app é instalado
@@ -128,6 +128,66 @@ const PWAInstallPrompt = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Componente para botão de instalação manual
+export const PWAInstallButton = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Verificar se já está instalado
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      console.log('Usuário aceitou instalar a PWA');
+    }
+
+    setDeferredPrompt(null);
+  };
+
+  if (isInstalled || !deferredPrompt) {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={handleInstallClick}
+      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+      title="Instalar aplicativo"
+    >
+      <Download className="h-4 w-4" />
+      Instalar App
+    </button>
   );
 };
 

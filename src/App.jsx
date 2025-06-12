@@ -25,7 +25,7 @@ import ProdutosTab from './components/ProdutosTab.jsx';
 import CategoriasTab from './components/CategoriasTab.jsx';
 import RelatoriosTab from './components/RelatoriosTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
-import PWAInstallPrompt from './components/PWAInstallPrompt.jsx';
+import PWAInstallPrompt, { PWAInstallButton } from './components/PWAInstallPrompt.jsx';
 import Modal, { useModal } from './components/Modal.jsx';
 import appSettings from './services/AppSettings.js';
 import PDFReportService from './services/PDFReportService.js';
@@ -798,6 +798,7 @@ const handlePrintOrder = async (order) => {
             </div>
             
             <div className="flex items-center space-x-4">
+              <PWAInstallButton />
               <div className="bg-blue-100 px-4 py-2 rounded-lg">
                 <p className="text-sm text-blue-800 font-medium">
                   {new Date().toLocaleDateString('pt-BR', { 
