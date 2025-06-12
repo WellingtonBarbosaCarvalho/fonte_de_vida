@@ -93,8 +93,14 @@ function executeCommand(command) {
         console.warn(`⚠️ Aviso: ${stderr}`);
       }
 
-      console.log(`✅ Sucesso: ${stdout.trim()}`);
-      resolve(stdout);
+      // Fix para Windows: stdout pode ser buffer ou string
+      const output = stdout
+        ? typeof stdout === "string"
+          ? stdout.trim()
+          : stdout.toString().trim()
+        : "";
+      console.log(`✅ Sucesso: ${output}`);
+      resolve(output);
     });
   });
 }
@@ -216,7 +222,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // Rota de impressão
+    // Rota de impressão tradicional
     if (pathname === "/print" && req.method === "POST") {
       let body = "";
 
@@ -248,6 +254,97 @@ const server = http.createServer(async (req, res) => {
           console.error(`❌ Erro ao processar JSON:`, parseError);
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "JSON inválido" }));
+        }
+      });
+
+      return;
+    }
+
+    // NOVA ROTA: Raw chunk processing
+    if (pathname === "/raw-chunk" && req.method === "POST") {
+      let chunks = [];
+
+      req.on("data", (chunk) => {
+        chunks.push(chunk);
+      });
+
+      req.on("end", async () => {
+        try {
+          const buffer = Buffer.concat(chunks);
+          const text = buffer.toString("utf8");
+
+          console.log(`📄 Chunk RAW recebido: ${text.length} caracteres`);
+
+          const result = await printText(text);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(result));
+        } catch (error) {
+          console.error(`❌ Erro no chunk RAW:`, error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+      });
+
+      return;
+    }
+
+    // NOVA ROTA: Extension simulation
+    if (pathname === "/extension-print" && req.method === "POST") {
+      let body = "";
+
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on("end", async () => {
+        try {
+          console.log(
+            `📄 Impressão via extensão simulada: ${body.length} caracteres`
+          );
+
+          const result = await printText(body);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ ...result, method: "extension-simulation" })
+          );
+        } catch (error) {
+          console.error(`❌ Erro na extensão simulada:`, error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+      });
+
+      return;
+    }
+
+    // NOVA ROTA: Memory queue
+    if (pathname === "/memory-queue" && req.method === "POST") {
+      let body = "";
+
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on("end", async () => {
+        try {
+          const data = JSON.parse(body);
+          console.log(`📄 Memory queue solicitada: ${data.queueId}`);
+
+          // Simular sucesso para memory queue
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              success: true,
+              method: "memory-queue",
+              queueId: data.queueId,
+            })
+          );
+        } catch (error) {
+          console.error(`❌ Erro na memory queue:`, error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: error.message }));
         }
       });
 

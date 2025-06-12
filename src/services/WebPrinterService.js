@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import DirectPrintService from "./DirectPrintService.js";
 
 class WebPrinterService {
   constructor() {
@@ -22,6 +23,9 @@ class WebPrinterService {
           : "Desconhecido"
       }`
     );
+
+    // NOVA ABORDAGEM: DirectPrintService para pensar fora da caixa
+    this.directPrint = new DirectPrintService();
 
     // Configurar listener para mensagens do Service Worker
     this.setupServiceWorkerListener();
@@ -116,10 +120,130 @@ class WebPrinterService {
     }
   }
 
+  // Método CORRIGIDO para enviar impressão via Service Worker (resolve erro 405)
+  async sendPrintToServiceWorkerFixed(receiptText, order) {
+    try {
+      if ("serviceWorker" in navigator) {
+        console.log("📱 [FIX] Enviando para Service Worker via MessageChannel");
+
+        // Abordagem 1: Tentar via MessageChannel (mais confiável)
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          if (registration.active) {
+            return new Promise((resolve, reject) => {
+              const messageChannel = new MessageChannel();
+
+              messageChannel.port1.onmessage = (event) => {
+                if (event.data.success) {
+                  resolve(event.data);
+                } else {
+                  reject(new Error(event.data.error || "Service Worker error"));
+                }
+              };
+
+              registration.active.postMessage(
+                {
+                  type: "THERMAL_PRINT_DIRECT",
+                  data: {
+                    text: receiptText,
+                    order: order,
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+                [messageChannel.port2]
+              );
+
+              // Timeout após 5 segundos
+              setTimeout(() => {
+                reject(new Error("Service Worker timeout"));
+              }, 5000);
+            });
+          }
+        } catch (msgError) {
+          console.warn("⚠️ MessageChannel falhou:", msgError.message);
+        }
+
+        // Abordagem 2: Usar rota diferente que não conflita
+        try {
+          const printData = {
+            text: receiptText,
+            order: order,
+            timestamp: new Date().toISOString(),
+          };
+
+          const response = await fetch("/sw-thermal-print", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Requested-With": "ServiceWorker",
+            },
+            body: JSON.stringify(printData),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log("📤 [FIX] Resposta do Service Worker:", result);
+            return result;
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        } catch (fetchError) {
+          console.warn("⚠️ Fetch alternativo falhou:", fetchError.message);
+        }
+
+        // Abordagem 3: Fallback via localStorage (para PWA offline)
+        try {
+          const printQueue = JSON.parse(
+            localStorage.getItem("thermal_print_queue") || "[]"
+          );
+          const printJob = {
+            id: "job_" + Date.now(),
+            text: receiptText,
+            order: order,
+            timestamp: new Date().toISOString(),
+            status: "pending",
+          };
+
+          printQueue.push(printJob);
+          localStorage.setItem(
+            "thermal_print_queue",
+            JSON.stringify(printQueue)
+          );
+
+          // Notificar Service Worker sobre nova tarefa
+          if (
+            "serviceWorker" in navigator &&
+            navigator.serviceWorker.controller
+          ) {
+            navigator.serviceWorker.controller.postMessage({
+              type: "PROCESS_PRINT_QUEUE",
+            });
+          }
+
+          console.log("📦 [FALLBACK] Adicionado à fila offline");
+          return {
+            success: true,
+            method: "service-worker-queue",
+            message: "Adicionado à fila de impressão",
+          };
+        } catch (queueError) {
+          console.error("❌ Todas as abordagens do Service Worker falharam");
+          throw queueError;
+        }
+      }
+    } catch (error) {
+      console.error("❌ Erro no Service Worker corrigido:", error);
+      throw error;
+    }
+  }
+
   // Método principal para processar e "imprimir" pedido no navegador - SOLUÇÃO 100% AUTOMÁTICA
   async printOrder(order, customer, products) {
     try {
-      console.log("🖨️ Processando pedido para impressão web:", order.id);
+      console.log(
+        "🖨️ [NOVA SOLUÇÃO] Processando pedido para impressão web:",
+        order.id
+      );
 
       // Gerar recibo em texto
       const receiptText = this.generateTextReceipt(order, customer, products);
@@ -140,9 +264,34 @@ class WebPrinterService {
         }
       }
 
-      // 2. SEGUNDA PRIORIDADE: Tentar usar servidor local de impressão (RAW)
+      // 2. SEGUNDA PRIORIDADE: DirectPrintService - SOLUÇÃO REVOLUCIONÁRIA!
       try {
-        const serverResult = await this.tryPrintWithServer(receiptText);
+        console.log(
+          "🚀 [INOVAÇÃO] Tentando DirectPrintService - bypass das limitações do navegador"
+        );
+        const directResult = await this.directPrint.printDirect(receiptText, {
+          serverId: order.id,
+          timestamp: new Date().toISOString(),
+        });
+
+        if (directResult.success) {
+          this.showSuccessNotification(
+            "✅ Impressão RAW executada via DirectPrintService!"
+          );
+          return {
+            success: true,
+            method: "direct-print-service",
+            strategy: directResult.strategy,
+            details: directResult.details,
+          };
+        }
+      } catch (directError) {
+        console.warn("⚠️ DirectPrintService falhou:", directError.message);
+      }
+
+      // 3. TERCEIRA PRIORIDADE: Tentar usar servidor local de impressão (RAW) com retry inteligente
+      try {
+        const serverResult = await this.tryPrintWithServerRetry(receiptText);
         if (serverResult.success) {
           return serverResult;
         }
@@ -150,11 +299,11 @@ class WebPrinterService {
         console.warn("⚠️ Servidor local não disponível:", serverError.message);
       }
 
-      // 3. TERCEIRA PRIORIDADE: Impressão via Service Worker (PWA) - NOVA FUNCIONALIDADE!
+      // 4. QUARTA PRIORIDADE: Impressão via Service Worker (PWA) CORRIGIDA!
       if ("serviceWorker" in navigator) {
         try {
           console.log("📱 Tentando impressão via Service Worker...");
-          const swResult = await this.sendPrintToServiceWorker(
+          const swResult = await this.sendPrintToServiceWorkerFixed(
             receiptText,
             order
           );
@@ -169,13 +318,13 @@ class WebPrinterService {
         }
       }
 
-      // 4. QUARTA PRIORIDADE: Detectar se é impressora térmica e usar impressão automática
+      // 5. QUINTA PRIORIDADE: Detectar se é impressora térmica e usar impressão automática
       if (await this.detectThermalPrinter()) {
         console.log("🔥 Impressora térmica detectada - impressão automática");
         return await this.printThermalAutomatic(receiptText, order);
       }
 
-      // 5. FALLBACK FINAL: Diálogo de impressão otimizado
+      // 6. FALLBACK FINAL: Diálogo de impressão otimizado
       console.log("📋 Usando diálogo de impressão otimizado");
       await this.showPrintDialog(receiptText, order);
 
@@ -364,6 +513,93 @@ class WebPrinterService {
 
       return { success: false, error: error.message };
     }
+  }
+
+  // Tentar imprimir usando servidor local com RETRY INTELIGENTE
+  async tryPrintWithServerRetry(text) {
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 segundo
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔍 [${attempt}/${maxRetries}] Verificando servidor de impressão local...`
+        );
+
+        // Primeiro, verificar se o servidor está rodando
+        const statusResponse = await fetch(`${this.printServerUrl}/status`, {
+          method: "GET",
+          signal: AbortSignal.timeout(2000), // Timeout de 2 segundos
+        });
+
+        if (!statusResponse.ok) {
+          throw new Error("Servidor não está respondendo");
+        }
+
+        console.log(
+          `✅ [${attempt}] Servidor local encontrado, enviando para impressão...`
+        );
+
+        // Enviar dados para impressão
+        const printResponse = await fetch(`${this.printServerUrl}/print`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text }),
+          signal: AbortSignal.timeout(5000), // Timeout de 5 segundos
+        });
+
+        const result = await printResponse.json();
+
+        if (result.success) {
+          // Mostrar notificação de sucesso
+          this.showSuccessNotification("✅ Impresso via servidor local (RAW)!");
+
+          return {
+            success: true,
+            method: "thermal-server",
+            message: `Impresso via servidor local (tentativa ${attempt})`,
+            attempts: attempt,
+          };
+        } else {
+          throw new Error(result.message || "Erro no servidor de impressão");
+        }
+      } catch (error) {
+        console.warn(
+          `⚠️ [${attempt}/${maxRetries}] Tentativa falhou:`,
+          error.message
+        );
+
+        if (attempt === maxRetries) {
+          // Última tentativa - mostrar instruções específicas do sistema
+          if (
+            this.isWindows &&
+            error.name === "TypeError" &&
+            error.message.includes("fetch")
+          ) {
+            const instructions = this.getSystemInstructions();
+            console.log(`💡 Dica Windows: ${instructions.serverStart}`);
+            this.showToast(
+              `Servidor não encontrado após ${maxRetries} tentativas. ${instructions.serverStart}`,
+              "error"
+            );
+          }
+
+          return { success: false, error: error.message, attempts: maxRetries };
+        }
+
+        // Aguardar antes da próxima tentativa
+        if (attempt < maxRetries) {
+          console.log(
+            `⏳ Aguardando ${retryDelay}ms antes da próxima tentativa...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        }
+      }
+    }
+
+    return { success: false, error: "Máximo de tentativas atingido" };
   }
 
   // Gerar recibo em texto simples

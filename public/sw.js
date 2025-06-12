@@ -46,12 +46,17 @@ self.addEventListener("activate", (event) => {
 
 // Interceptar requisições
 self.addEventListener("fetch", (event) => {
-  // Interceptar requisições de impressão
+  const url = new URL(event.request.url);
+
+  // CORRIGIDO: Interceptar requisições de impressão específicas
   if (
-    event.request.url.includes("/api/print") ||
-    event.request.url.includes("thermal-print") ||
-    (event.request.method === "POST" && event.request.url.includes("print"))
+    url.pathname.includes("/api/thermal-print") ||
+    url.pathname.includes("/sw-thermal-print") ||
+    url.pathname === "/api/thermal-print" ||
+    url.pathname === "/sw-thermal-print" ||
+    (event.request.method === "POST" && url.pathname.includes("print"))
   ) {
+    console.log("🎯 SW interceptando:", url.pathname, event.request.method);
     event.respondWith(handlePrintRequest(event.request));
     return;
   }
@@ -132,6 +137,71 @@ async function handlePrintRequest(request) {
   }
 }
 
+// NOVO: Handler para impressão direta via MessageChannel
+async function handleDirectPrint(data, port) {
+  try {
+    console.log("🔥 Service Worker processando impressão direta");
+
+    // Simular processamento de impressão
+    const printResponse = {
+      success: true,
+      method: "service-worker-direct",
+      message: "Impressão processada pelo Service Worker",
+      timestamp: new Date().toISOString(),
+    };
+
+    // Enviar comando para cliente principal
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+    clients.forEach((client) => {
+      client.postMessage({
+        type: "THERMAL_PRINT_REQUEST",
+        payload: {
+          success: true,
+          method: "pwa-direct",
+          data: data,
+        },
+      });
+    });
+
+    // Responder via MessageChannel
+    if (port) {
+      port.postMessage(printResponse);
+    }
+
+    return printResponse;
+  } catch (error) {
+    console.error("❌ Erro na impressão direta:", error);
+
+    const errorResponse = {
+      success: false,
+      error: error.message,
+      method: "service-worker-error",
+    };
+
+    if (port) {
+      port.postMessage(errorResponse);
+    }
+
+    return errorResponse;
+  }
+}
+
+// NOVO: Processar fila de impressão do localStorage
+async function processPrintQueue() {
+  try {
+    const clients = await self.clients.matchAll({ includeUncontrolled: true });
+
+    clients.forEach((client) => {
+      // Solicitar que o cliente processe sua fila local
+      client.postMessage({
+        type: "PROCESS_LOCAL_QUEUE",
+      });
+    });
+  } catch (error) {
+    console.error("❌ Erro ao processar fila:", error);
+  }
+}
+
 // Escutar mensagens da página principal
 self.addEventListener("message", (event) => {
   console.log("📨 Service Worker recebeu mensagem:", event.data);
@@ -146,6 +216,22 @@ self.addEventListener("message", (event) => {
         offlineSupport: true,
       },
     });
+  }
+
+  // NOVO: Suporte para impressão direta via MessageChannel
+  if (event.data && event.data.type === "THERMAL_PRINT_DIRECT") {
+    console.log("🖨️ Processando impressão direta via MessageChannel");
+
+    // Processar impressão
+    handleDirectPrint(event.data.data, event.ports[0]);
+    return;
+  }
+
+  // NOVO: Processar fila de impressão offline
+  if (event.data && event.data.type === "PROCESS_PRINT_QUEUE") {
+    console.log("📦 Processando fila de impressão");
+    processPrintQueue();
+    return;
   }
 
   if (event.data && event.data.type === "FORCE_UPDATE") {

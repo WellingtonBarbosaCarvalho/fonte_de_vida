@@ -28,7 +28,7 @@ files=(
     "src/services/WebPrinterService.js"
     "src/components/SettingsTab.jsx" 
     "public/sw.js"
-    "thermal-print-server.js"
+    "thermal-print-server.cjs"
     "install-windows.bat"
     "start-thermal-server.sh"
 )
@@ -107,8 +107,8 @@ fi
 echo -e "\n${BLUE}📋 6. Verificando servidor de impressão...${NC}"
 
 # Verificar servidor Node.js
-if [ -f "thermal-print-server.js" ]; then
-    if grep -q "3001" thermal-print-server.js; then
+if [ -f "thermal-print-server.cjs" ]; then
+    if grep -q "3001" thermal-print-server.cjs; then
         show_status 0 "Servidor de impressão configurado (porta 3001)"
     else
         show_status 1 "Servidor de impressão sem porta configurada"

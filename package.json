@@ -11,10 +11,12 @@
     "preview": "vite preview",
     "serve": "vite preview --host",
     "build:pwa": "vite build",
-    "print-server": "node thermal-print-server.js",
+    "print-server": "node thermal-print-server.cjs",
     "start:full": "concurrently \"npm run print-server\" \"npm run dev\"",
     "install:windows": "install-windows.bat",
-    "start:production": "npm run build && npm run serve"
+    "start:production": "npm run build && npm run serve",
+    "test:print": "./test-impressao-completo.sh",
+    "test:auto": "./test-solucao-automatica.sh"
   },
   "dependencies": {
     "clsx": "^2.0.0",

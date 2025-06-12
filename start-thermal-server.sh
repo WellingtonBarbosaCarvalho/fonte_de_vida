@@ -14,8 +14,8 @@ if ! command -v node &> /dev/null; then
 fi
 
 # Verificar se o arquivo do servidor existe
-if [ ! -f "thermal-print-server.js" ]; then
-    echo "❌ Arquivo thermal-print-server.js não encontrado!"
+if [ ! -f "thermal-print-server.cjs" ]; then
+    echo "❌ Arquivo thermal-print-server.cjs não encontrado!"
     echo "💡 Execute este script na pasta do projeto"
     exit 1
 fi
@@ -24,7 +24,7 @@ fi
 echo "🔍 Verificando processos na porta 3001..."
 if lsof -Pi :3001 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "⚠️ Porta 3001 já está em uso, encerrando processo..."
-    pkill -f "thermal-print-server.js" 2>/dev/null || true
+    pkill -f "thermal-print-server.cjs" 2>/dev/null || true
     sleep 2
 fi
 
@@ -46,4 +46,4 @@ echo "📋 Para parar o servidor, pressione Ctrl+C"
 echo ""
 
 # Iniciar o servidor
-node thermal-print-server.js
+node thermal-print-server.cjs
