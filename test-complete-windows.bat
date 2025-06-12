@@ -1,24 +1,24 @@
 @echo off
-:: Script de Teste Completo - Sistema Fonte de Vida
-:: Testa todas as funcionalidades de impressão
-
-title Teste Completo - Sistema Fonte de Vida
+chcp 65001 >nul
+title 🎯 TESTE COMPLETO - SOLUÇÃO 100%% AUTOMÁTICA
 
 echo.
-echo ===============================================
-echo 🧪 TESTE COMPLETO - SISTEMA FONTE DE VIDA
-echo ===============================================
+echo 🎯 TESTE COMPLETO - SOLUÇÃO 100%% AUTOMÁTICA
+echo ==============================================
 echo.
 
-set ERROR_COUNT=0
-set TEST_COUNT=0
+REM Verificar se está executando como administrador
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo ❌ ERRO: Execute este script como Administrador
+    echo 💡 Clique direito no arquivo e selecione "Executar como administrador"
+    echo.
+    pause
+    exit /b 1
+)
 
-:: Função para incrementar testes
-:increment_test
-set /a TEST_COUNT+=1
-goto :eof
-
-:: Função para incrementar erros
+echo ✅ Executando como Administrador
+echo.
 :increment_error
 set /a ERROR_COUNT+=1
 goto :eof
