@@ -10,7 +10,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "serve": "vite preview --host",
-    "build:pwa": "vite build"
+    "build:pwa": "vite build",
+    "print-server": "node thermal-print-server.js",
+    "start:full": "concurrently \"npm run print-server\" \"npm run dev\""
   },
   "dependencies": {
     "clsx": "^2.0.0",

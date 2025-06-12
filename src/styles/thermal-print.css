@@ -1,0 +1,83 @@
+/* CSS específico para impressão térmica */
+@media print {
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    background: transparent !important;
+    color: black !important;
+  }
+
+  body {
+    font-family: "Courier New", monospace !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    width: 80mm !important; /* Largura padrão de impressora térmica */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .thermal-receipt {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-width: 80mm !important;
+    font-family: "Courier New", monospace !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    white-space: pre-line !important;
+    word-wrap: break-word !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Ocultar tudo exceto o recibo */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Configurações específicas para impressoras térmicas */
+  @page {
+    size: 80mm auto !important; /* Largura fixa, altura automática */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Forçar texto preto sólido */
+  .thermal-receipt * {
+    color: black !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Estilos para texto em negrito */
+  .thermal-bold {
+    font-weight: bold !important;
+    font-size: 13px !important;
+  }
+
+  /* Estilos para texto centralizado */
+  .thermal-center {
+    text-align: center !important;
+  }
+
+  /* Separadores */
+  .thermal-divider {
+    border-top: 1px solid black !important;
+    margin: 2px 0 !important;
+  }
+}
+
+/* Estilos para visualização na tela */
+@media screen {
+  .thermal-preview {
+    max-width: 300px;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.2;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: white;
+    margin: 20px auto;
+  }
+}

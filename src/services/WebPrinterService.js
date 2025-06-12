@@ -3,6 +3,7 @@ import { format } from "date-fns";
 class WebPrinterService {
   constructor() {
     this.paperWidth = 42; // Largura do papel em caracteres (48mm térmico)
+    this.printServerUrl = "http://localhost:3001"; // Servidor local de impressão
     console.log("🖨️ WebPrinterService inicializado para ambiente web");
   }
 
@@ -14,13 +15,65 @@ class WebPrinterService {
       // Gerar recibo em texto
       const receiptText = this.generateTextReceipt(order, customer, products);
 
-      // Opções de impressão no navegador
+      // Tentar usar servidor local primeiro
+      const serverResult = await this.tryPrintWithServer(receiptText);
+      if (serverResult.success) {
+        console.log("✅ Impressão via servidor local bem-sucedida!");
+        return serverResult;
+      }
+
+      // Fallback: diálogo de impressão do navegador
+      console.log("📋 Usando fallback: diálogo de impressão do navegador");
       await this.showPrintDialog(receiptText, order);
 
       return { success: true, method: "web-browser" };
     } catch (error) {
       console.error("❌ Erro na impressão web:", error);
       throw error;
+    }
+  }
+
+  // Tentar imprimir usando servidor local
+  async tryPrintWithServer(text) {
+    try {
+      console.log("🔍 Verificando servidor de impressão local...");
+
+      // Primeiro, verificar se o servidor está rodando
+      const statusResponse = await fetch(`${this.printServerUrl}/status`, {
+        method: "GET",
+        signal: AbortSignal.timeout(2000), // Timeout de 2 segundos
+      });
+
+      if (!statusResponse.ok) {
+        throw new Error("Servidor não está respondendo");
+      }
+
+      console.log("✅ Servidor local encontrado, enviando para impressão...");
+
+      // Enviar dados para impressão
+      const printResponse = await fetch(`${this.printServerUrl}/print`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+        signal: AbortSignal.timeout(5000), // Timeout de 5 segundos
+      });
+
+      const result = await printResponse.json();
+
+      if (result.success) {
+        return {
+          success: true,
+          method: "thermal-server",
+          message: "Impresso via servidor local (RAW)",
+        };
+      } else {
+        throw new Error(result.message || "Erro no servidor de impressão");
+      }
+    } catch (error) {
+      console.warn("⚠️ Servidor local não disponível:", error.message);
+      return { success: false, error: error.message };
     }
   }
 
@@ -153,30 +206,130 @@ class WebPrinterService {
       <html>
       <head>
         <title>Pedido ${order.id}</title>
+        <meta charset="UTF-8">
         <style>
+          /* Estilos para visualização na tela */
           body {
             font-family: 'Courier New', monospace;
             font-size: 12px;
             margin: 10px;
             line-height: 1.2;
+            background: #f5f5f5;
           }
-          .receipt {
-            white-space: pre-line;
+          .thermal-preview {
             max-width: 300px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: white;
+            margin: 20px auto;
+            white-space: pre-line;
           }
+          .controls {
+            text-align: center;
+            margin-bottom: 20px;
+          }
+          .controls button {
+            margin: 5px;
+            padding: 10px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background: #007acc;
+            color: white;
+          }
+          .controls button:hover {
+            background: #005c99;
+          }
+          .instructions {
+            text-align: center;
+            margin: 20px;
+            padding: 15px;
+            background: #e8f4fd;
+            border: 1px solid #b8ddf2;
+            border-radius: 5px;
+            font-size: 13px;
+          }
+
+          /* CSS para impressão térmica */
           @media print {
-            body { margin: 0; }
-            .no-print { display: none; }
+            * {
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              text-shadow: none !important;
+              background: transparent !important;
+              color: black !important;
+            }
+
+            body {
+              font-family: 'Courier New', monospace !important;
+              font-size: 12px !important;
+              line-height: 1.2 !important;
+              width: 80mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: white !important;
+            }
+
+            .thermal-receipt {
+              width: 80mm !important;
+              max-width: 80mm !important;
+              min-width: 80mm !important;
+              font-family: 'Courier New', monospace !important;
+              font-size: 12px !important;
+              line-height: 1.2 !important;
+              white-space: pre-line !important;
+              word-wrap: break-word !important;
+              page-break-inside: avoid !important;
+              color: black !important;
+              background: white !important;
+            }
+
+            .no-print {
+              display: none !important;
+            }
+
+            @page {
+              size: 80mm auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+
+            .thermal-receipt * {
+              color: black !important;
+              background: white !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
           }
         </style>
       </head>
       <body>
-        <div class="no-print" style="margin-bottom: 10px;">
-          <button onclick="window.print()">🖨️ Imprimir</button>
-          <button onclick="window.close()">❌ Fechar</button>
+        <div class="no-print controls">
+          <button onclick="window.print()">🖨️ Imprimir Agora</button>
           <button onclick="downloadAsText()">💾 Baixar TXT</button>
+          <button onclick="window.close()">❌ Fechar</button>
         </div>
-        <div class="receipt">${receiptText}</div>
+        
+        <div class="no-print instructions">
+          <strong>📋 Instruções para Impressora Térmica:</strong><br>
+          1. Certifique-se que a impressora "Generic / Text Only" está conectada<br>
+          2. Clique em "🖨️ Imprimir Agora"<br>
+          3. Na caixa de diálogo, selecione "Generic / Text Only"<br>
+          4. Configure: Tamanho do papel = A4 ou Personalizado (80mm)<br>
+          5. Margens: 0 em todos os lados<br>
+          6. Clique em Imprimir
+        </div>
+        
+        <!-- Preview na tela -->
+        <div class="no-print thermal-preview">${receiptText}</div>
+        
+        <!-- Conteúdo real para impressão -->
+        <div class="thermal-receipt">${receiptText}</div>
         
         <script>
           function downloadAsText() {
@@ -192,10 +345,15 @@ class WebPrinterService {
             document.body.removeChild(element);
           }
           
-          // Auto print em 1 segundo
-          setTimeout(() => {
+          // Função para imprimir com configurações específicas
+          function printThermal() {
             window.print();
-          }, 1000);
+          }
+          
+          // Focar na janela
+          window.focus();
+          
+          console.log('💡 Dica: Selecione a impressora "Generic / Text Only" na caixa de diálogo');
         </script>
       </body>
       </html>
@@ -226,6 +384,13 @@ class WebPrinterService {
         ==================
       `;
 
+      // Tentar servidor local primeiro
+      const serverResult = await this.tryPrintWithServer(testData);
+      if (serverResult.success) {
+        return { success: true, method: "thermal-server-test" };
+      }
+
+      // Fallback: diálogo do navegador
       await this.showPrintDialog(testData, { id: "TESTE" });
       return { success: true, method: "web-test" };
     } catch (error) {
