@@ -572,8 +572,6 @@ const SettingsTab = ({ modal }) => {
           </div>
         </div>
       )}
-        </div>
-      </div>
 
       <div className="space-y-4">
         <h4 className="font-medium text-gray-900">Opções de Impressão</h4>
