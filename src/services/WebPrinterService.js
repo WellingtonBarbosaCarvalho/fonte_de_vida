@@ -4,7 +4,22 @@ class WebPrinterService {
   constructor() {
     this.paperWidth = 42; // Largura do papel em caracteres (48mm térmico)
     this.printServerUrl = "http://localhost:3001"; // Servidor local de impressão
+    this.isWindows = navigator.platform.indexOf("Win") > -1;
+    this.isLinux = navigator.platform.indexOf("Linux") > -1;
+    this.isMac = navigator.platform.indexOf("Mac") > -1;
+
     console.log("🖨️ WebPrinterService inicializado para ambiente web");
+    console.log(
+      `💻 Sistema detectado: ${
+        this.isWindows
+          ? "Windows"
+          : this.isLinux
+          ? "Linux"
+          : this.isMac
+          ? "macOS"
+          : "Desconhecido"
+      }`
+    );
   }
 
   // Método principal para processar e "imprimir" pedido no navegador
@@ -63,6 +78,9 @@ class WebPrinterService {
       const result = await printResponse.json();
 
       if (result.success) {
+        // Mostrar notificação de sucesso
+        this.showSuccessNotification("Impresso via servidor local (RAW)");
+
         return {
           success: true,
           method: "thermal-server",
@@ -73,6 +91,21 @@ class WebPrinterService {
       }
     } catch (error) {
       console.warn("⚠️ Servidor local não disponível:", error.message);
+
+      // Mostrar dica específica para Windows
+      if (
+        this.isWindows &&
+        error.name === "TypeError" &&
+        error.message.includes("fetch")
+      ) {
+        const instructions = this.getSystemInstructions();
+        console.log(`💡 Dica Windows: ${instructions.serverStart}`);
+        this.showToast(
+          `Servidor não encontrado. ${instructions.serverStart}`,
+          "error"
+        );
+      }
+
       return { success: false, error: error.message };
     }
   }
@@ -402,6 +435,139 @@ class WebPrinterService {
   // Compatibilidade com a interface antiga
   async printElectronRAW() {
     throw new Error("Método Electron não disponível no modo web");
+  }
+
+  // Mostrar notificação de sucesso
+  showSuccessNotification(message) {
+    // Tentar usar Notification API se disponível
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("✅ Impressão Realizada", {
+        body: message,
+        icon: "/icon.svg",
+        badge: "/icon.svg",
+      });
+    }
+
+    // Sempre mostrar no console
+    console.log(`✅ ${message}`);
+
+    // Mostrar alerta visual se possível
+    if (typeof window !== "undefined") {
+      // Criar toast notification simples
+      this.showToast(message, "success");
+    }
+  }
+
+  // Mostrar toast notification
+  showToast(message, type = "info") {
+    // Remover toast anterior se existir
+    const existingToast = document.getElementById("thermal-print-toast");
+    if (existingToast) {
+      existingToast.remove();
+    }
+
+    // Criar elemento toast
+    const toast = document.createElement("div");
+    toast.id = "thermal-print-toast";
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 10000;
+      max-width: 400px;
+      opacity: 0;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+      ${
+        type === "success"
+          ? "background: #10B981;"
+          : type === "error"
+          ? "background: #EF4444;"
+          : "background: #3B82F6;"
+      }
+    `;
+
+    toast.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 16px;">
+          ${type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️"}
+        </span>
+        <span>${message}</span>
+      </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Animar entrada
+    setTimeout(() => {
+      toast.style.opacity = "1";
+      toast.style.transform = "translateX(0)";
+    }, 100);
+
+    // Remover após 4 segundos
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(100%)";
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 4000);
+  }
+
+  // Verificar status do servidor de impressão
+  async checkPrintServerStatus() {
+    try {
+      const response = await fetch(`${this.printServerUrl}/status`, {
+        method: "GET",
+        signal: AbortSignal.timeout(1000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          available: true,
+          data,
+        };
+      }
+      return { available: false };
+    } catch (error) {
+      return {
+        available: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Mostrar instruções específicas do sistema
+  getSystemInstructions() {
+    if (this.isWindows) {
+      return {
+        serverStart: 'Execute "start-thermal-server.bat" como administrador',
+        printerCheck: "Painel de Controle > Dispositivos e Impressoras",
+        printCommand: 'copy arquivo.txt "Generic / Text Only"',
+      };
+    } else if (this.isLinux) {
+      return {
+        serverStart: 'Execute "./start-thermal-server.sh"',
+        printerCheck: "lpstat -p | grep Generic",
+        printCommand: 'lpr -P "Generic / Text Only" arquivo.txt',
+      };
+    } else {
+      return {
+        serverStart: 'Execute "./start-thermal-server.sh"',
+        printerCheck: "lpstat -p | grep Generic",
+        printCommand: 'lpr -P "Generic / Text Only" arquivo.txt',
+      };
+    }
   }
 }
 

@@ -12,7 +12,9 @@
     "serve": "vite preview --host",
     "build:pwa": "vite build",
     "print-server": "node thermal-print-server.js",
-    "start:full": "concurrently \"npm run print-server\" \"npm run dev\""
+    "start:full": "concurrently \"npm run print-server\" \"npm run dev\"",
+    "install:windows": "install-windows.bat",
+    "start:production": "npm run build && npm run serve"
   },
   "dependencies": {
     "clsx": "^2.0.0",
